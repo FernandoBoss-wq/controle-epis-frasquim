@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frasquim - Trocas Trimestrais de EPI</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #0b1329; color: #f8fafc; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased">
+
+  <!-- Banner Modo Somente Leitura -->
+  <div id="readOnlyBanner" class="hidden bg-amber-500/20 border-b border-amber-500/40 text-amber-300 px-4 py-2.5 text-sm flex items-center justify-between">
+    <div class="flex items-center gap-2 font-medium">
+      <i data-lucide="lock" class="w-4 h-4"></i>
+      <span>Modo Somente Visualização Ativado. Alterações e baixas estão bloqueadas para seu perfil.</span>
+    </div>
+    <span class="text-xs bg-amber-500/30 px-2 py-0.5 rounded border border-amber-500/50 font-semibold">Visualização Externa</span>
+  </div>
+
+  <!-- Header Superior -->
+  <header class="bg-slate-900/90 backdrop-blur border-b border-slate-800 sticky top-0 z-40 px-6 py-4">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 shadow-inner">
+          <i data-lucide="hard-hat" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold text-white tracking-tight">Frasquim - Trocas Trimestrais de EPI</h1>
+            <span class="text-xs bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 px-2.5 py-0.5 rounded-full font-semibold">Ciclo 3 Meses</span>
+          </div>
+          <p class="text-xs text-slate-400">Base filtrada: Sem protetor plug/silicone • Posição: 10/09/2026</p>
+        </div>
+      </div>
+
+      <!-- Ações do Cabeçalho -->
+      <div class="flex flex-wrap items-center gap-3">
+        <!-- Botão Exportar Excel -->
+        <button onclick="exportToExcel()" class="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold px-4 py-2 rounded-lg transition shadow-lg shadow-emerald-900/30">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Exportar para Excel</span>
+        </button>
+
+        <!-- Botão Copiar Link Somente Leitura -->
+        <button onclick="copyReadOnlyLink()" id="btnShare" class="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-sm font-semibold px-4 py-2 rounded-lg transition">
+          <i data-lucide="share-2" class="w-4 h-4"></i>
+          <span>Link Somente Visualização</span>
+        </button>
+
+        <!-- Botão Resetar Dados (apenas em modo admin) -->
+        <button onclick="resetData()" id="btnReset" class="flex items-center gap-1.5 text-xs text-slate-400 hover:text-rose-400 p-2 rounded transition" title="Restaurar dados originais">
+          <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Container Principal -->
+  <main class="max-w-7xl mx-auto px-4 md:px-6 py-6 flex-1 w-full space-y-6">
+
+    <!-- Grid de Indicadores (KPIs) -->
+    <section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="bg-slate-800/50 border border-slate-700/60 p-4 rounded-xl shadow-sm">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Itens a Trocar</span>
+          <i data-lucide="package-search" class="w-4 h-4 text-indigo-400"></i>
+        </div>
+        <div class="text-2xl font-bold text-white" id="kpiTotal">72</div>
+        <div class="text-xs text-slate-400 mt-1">Trocas de ciclo longo</div>
+      </div>
+
+      <div class="bg-slate-800/50 border border-slate-700/60 p-4 rounded-xl shadow-sm">
+        <div class="flex items-center justify-between text-slate-400 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Colaboradores</span>
+          <i data-lucide="users-round" class="w-4 h-4 text-blue-400"></i>
+        </div>
+        <div class="text-2xl font-bold text-blue-400" id="kpiColabs">53</div>
+        <div class="text-xs text-slate-400 mt-1">Aguardando reposição</div>
+      </div>
+
+      <div class="bg-slate-800/50 border border-amber-500/30 p-4 rounded-xl shadow-sm bg-amber-500/5">
+        <div class="flex items-center justify-between text-amber-300 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Vence Hoje (10/09)</span>
+          <i data-lucide="alarm-clock" class="w-4 h-4 text-amber-400"></i>
+        </div>
+        <div class="text-2xl font-bold text-amber-400" id="kpiHoje">1</div>
+        <div class="text-xs text-amber-300/70 mt-1">Bruno Fagundes (Luva)</div>
+      </div>
+
+      <div class="bg-slate-800/50 border border-emerald-500/30 p-4 rounded-xl shadow-sm bg-emerald-500/5">
+        <div class="flex items-center justify-between text-emerald-300 mb-2">
+          <span class="text-xs font-semibold uppercase tracking-wider">Baixas Efetuadas</span>
+          <i data-lucide="check-check" class="w-4 h-4 text-emerald-400"></i>
+        </div>
+        <div class="text-2xl font-bold text-emerald-400" id="kpiEntregues">0</div>
+        <div class="text-xs text-emerald-300/70 mt-1" id="kpiProgresso">0% trocado</div>
+      </div>
+    </section>
+
+    <!-- Gráficos Analíticos -->
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Gráfico 1: Top EPIs Trimestrais -->
+      <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 shadow">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <i data-lucide="bar-chart-2" class="w-4 h-4 text-indigo-400"></i>
+            Demanda por Tipo de Equipamento
+          </h2>
+          <span class="text-xs text-slate-400">Quantidade Necessária</span>
+        </div>
+        <div class="h-64">
+          <canvas id="epiChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Gráfico 2: Status do Balcão -->
+      <div class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-5 shadow flex flex-col">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <i data-lucide="pie-chart" class="w-4 h-4 text-emerald-400"></i>
+            Progresso de Trocas no Almoxarifado
+          </h2>
+          <span class="text-xs text-slate-400">Monitoramento Ativo</span>
+        </div>
+        <div class="h-64 flex items-center justify-center">
+          <canvas id="statusChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filtros e Busca -->
+    <section class="bg-slate-800/40 border border-slate-700/60 rounded-xl p-4 shadow space-y-4">
+      <div class="flex flex-col md:flex-row gap-3 items-center justify-between">
+        <!-- Campo Busca -->
+        <div class="relative w-full md:w-80">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+          <input type="text" id="searchInput" oninput="applyFilters()" placeholder="Buscar por funcionário, EPI ou cargo..."
+            class="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+        </div>
+
+        <!-- Filtros Dropdown -->
+        <div class="flex flex-wrap gap-2 w-full md:w-auto items-center">
+          <select id="filterEPI" onchange="applyFilters()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
+            <option value="">Todos os Tipos de EPI</option>
+          </select>
+
+          <select id="filterStatus" onchange="applyFilters()" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500">
+            <option value="">Todos os Status</option>
+            <option value="Pendente">Pendente de Troca</option>
+            <option value="Entregue">Já Entregue / Trocado</option>
+          </select>
+
+          <button onclick="clearFilters()" class="text-xs text-slate-400 hover:text-white px-2 py-1.5 transition">
+            Limpar
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tabela Geral de Trocas Trimestrais -->
+    <section class="bg-slate-800/40 border border-slate-700/60 rounded-xl overflow-hidden shadow">
+      <div class="px-5 py-4 border-b border-slate-700/60 flex items-center justify-between bg-slate-800/30">
+        <div>
+          <h2 class="text-sm font-semibold text-slate-200">Lista Geral de Trocas (Sem Silicone Mensal)</h2>
+          <p class="text-xs text-slate-400">Total exibido: <span id="recordCount" class="font-bold text-white">72</span> trocas</p>
+        </div>
+        <div class="text-xs text-slate-400 italic">
+          Clique no botão "Editar" para registrar a nova entrega física
+        </div>
+      </div>
+
+      <div class="overflow-x-auto custom-scrollbar max-h-[580px]">
+        <table class="w-full text-left text-xs text-slate-300">
+          <thead class="bg-slate-900/90 text-slate-400 uppercase tracking-wider sticky top-0 z-10 border-b border-slate-700">
+            <tr>
+              <th class="py-3 px-4">#</th>
+              <th class="py-3 px-4">Funcionário</th>
+              <th class="py-3 px-4">Função</th>
+              <th class="py-3 px-4">Tipo de EPI</th>
+              <th class="py-3 px-4 text-center">Data Limite</th>
+              <th class="py-3 px-4 text-center">Status SGG</th>
+              <th class="py-3 px-4 text-center">Status Balcão</th>
+              <th class="py-3 px-4 text-center action-col">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody" class="divide-y divide-slate-800">
+            <!-- Inserido dinamicamente -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Modal de Edição / Registro de Baixa -->
+  <div id="editModal" class="hidden fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-white font-semibold text-base">
+          <i data-lucide="edit-3" class="w-5 h-5 text-indigo-400"></i>
+          <span>Registrar Troca de EPI</span>
+        </div>
+        <button onclick="closeModal()" class="text-slate-400 hover:text-white transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="editForm" onsubmit="saveEdit(event)" class="p-6 space-y-4">
+        <input type="hidden" id="editId">
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Funcionário</label>
+          <input type="text" id="editFuncionario" disabled class="w-full bg-slate-800 border border-slate-700 text-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Tipo de EPI</label>
+          <input type="text" id="editEPI" disabled class="w-full bg-slate-800 border border-slate-700 text-slate-300 rounded-lg px-3 py-2 text-sm">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status da Troca</label>
+          <select id="editStatus" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+            <option value="Pendente">Pendente</option>
+            <option value="Entregue">Entregue / Trocado</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Data da Nova Entrega</label>
+          <input type="date" id="editDataEntrega" class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Observações / C.A. / Assinatura</label>
+          <textarea id="editObs" rows="2" placeholder="Ex: Assinado na ficha de EPI física / C.A. nº..." class="w-full bg-slate-800 border border-slate-700 text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-indigo-500"></textarea>
+        </div>
+
+        <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-800">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 text-sm text-slate-400 hover:text-white transition">Cancelar</button>
+          <button type="submit" class="bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold px-5 py-2 rounded-lg transition shadow-lg shadow-indigo-900/30">Confirmar Troca</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast de Notificação -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+    <i data-lucide="check-circle" id="toastIcon" class="w-5 h-5 text-emerald-400"></i>
+    <span id="toastMsg" class="text-sm font-medium">Link copiado com sucesso!</span>
+  </div>
+
+  <script>
+    // DADOS INICIAIS DA BASE FILTRADA (SEM SILICONE)
+    const INITIAL_DATA = [{"id": 1, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Adriano Santos da Silva", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "27/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 2, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "AILTON DA SILVA CAMPOS", "funcao": "MECANICO DE SOPRO A", "epi": "CREME PROTETOR DE SEGURANÇA", "entregar_ate": "28/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 3, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "AILTON DA SILVA CAMPOS", "funcao": "MECANICO DE SOPRO A", "epi": "LUVA BRANCA TRICOTADA C/PIGMENTO", "entregar_ate": "28/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 4, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "AILTON DA SILVA CAMPOS", "funcao": "MECANICO DE SOPRO A", "epi": "OCULOS DE PROTEÇÃO QUADRADO INCOLOR", "entregar_ate": "28/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 5, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Alais Alves de Souza", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "15/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 6, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Ana Flavia Monteiro Oliveira", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "03/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 7, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "ANDERSON BEIJA CASTRO SILVA", "funcao": "ELETROMECÂNICO DE MANUTENÇÃO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "08/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 8, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "ANTONIO BISPO DOS SANTOS", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "29/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 9, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "BRUNO FAGUNDES GARCIA", "funcao": "ELETROMECÂNICO DE MANUTENÇÃO", "epi": "LUVA BRANCA TRICOTADA C/PIGMENTO", "entregar_ate": "10/09/2026", "situacao": "Vencendo Hoje", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 10, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "claudia Maria Demetino", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "03/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 11, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "claudia Maria Demetino", "funcao": "AJ DE PRODUÇAO", "epi": "OCULOS DE PROTEÇÃO QUADRADO INCOLOR", "entregar_ate": "20/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 12, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "DANIEL ALEXANDER CARBALLO SALAZAR", "funcao": "AUXILIAR DE APOIO A PRODUÇÃO", "epi": "OCULOS DE PROTEÇÃO UV ESPELHADO", "entregar_ate": "29/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 13, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "DEYVISON LEOANDER DA SILVA", "funcao": "ANALISTA GARANTIA DE QUALIDADE Jr", "epi": "LUVA DE PU CINZA", "entregar_ate": "31/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 14, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "ERICA ANGELICA DE FREITAS GONCALVES", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "03/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 15, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "ERICA ANGELICA DE FREITAS GONCALVES", "funcao": "AJ DE PRODUÇAO", "epi": "OCULOS DE PROTEÇÃO UV ESPELHADO", "entregar_ate": "28/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 16, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Ericles Bispo de Souza", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "03/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 17, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Ericles Bispo de Souza", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "15/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 18, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "FABIANO CRUZ FERREIRA", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "03/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 19, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "FABIANO CRUZ FERREIRA", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA  BRANCA TRICOTADA S/PIGMENTO", "entregar_ate": "31/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 20, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "FABRICIO DINIZ DA SILVA", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA NITRILICA", "entregar_ate": "31/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 21, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Felipe Bandeira da Silva", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "02/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 22, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Flavia Martins dos santos Dias", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "15/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 23, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Flavio batista da Silva", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "17/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 24, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Francisco Castagna de Freitas", "funcao": "AJ DE PRODUÇAO", "epi": "CALÇADO DE SEGURANÇA", "entregar_ate": "02/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 25, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Francisco Castagna de Freitas", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "02/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 26, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Francisco Castagna de Freitas", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "02/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 27, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Francisco Castagna de Freitas", "funcao": "AJ DE PRODUÇAO", "epi": "UNIFORME", "entregar_ate": "02/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 28, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "HILTON BARBOSA DE ANDRADE", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "03/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 29, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Jakeline Maria Santiago", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "26/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 30, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "JASON DOS SANTOS OLIVEIRA", "funcao": "ENC DE PRODUÇÃO", "epi": "OCULOS DE PROTEÇÃO QUADRADO INCOLOR", "entregar_ate": "29/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 31, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "JEFFERSON MODESTO RODRIGUES DE SOUZA", "funcao": "GERENTE MANUT ELETR E AUTOMOCAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "29/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 32, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Jessica Carça Castão", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "20/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 33, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Jessica Nayara Joaquim da Silva", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "29/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 34, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Jessica Nayara Joaquim da Silva", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "11/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 35, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "José Ronaldo C. Ramos", "funcao": "Mecânico de manutenção de máquinas, em geral", "epi": "LUVA BRANCA TRICOTADA C/PIGMENTO", "entregar_ate": "31/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 36, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "JOSE RONALDO DA SILVA", "funcao": "MECANICO SILK SCREEN JR", "epi": "CREME PROTETOR DE SEGURANÇA", "entregar_ate": "28/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 37, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Karen Cristina da Conceição Simoes", "funcao": "AJ DE PRODUÇAO", "epi": "CALÇADO DE SEGURANÇA", "entregar_ate": "27/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 38, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Karen Cristina da Conceição Simoes", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "27/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 39, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Karen Cristina da Conceição Simoes", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "27/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 40, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Karen Cristina da Conceição Simoes", "funcao": "AJ DE PRODUÇAO", "epi": "UNIFORME", "entregar_ate": "27/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 41, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Karina Maria de Almeida", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "27/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 42, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Leonardo de Oliveira Domingues", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "03/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 43, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Leonardo de Oliveira Domingues", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "04/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 44, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "LEONARDO DIAS DOS SANTOS", "funcao": "MECANICO SILK SCREEN SR", "epi": "OCULOS DE PROTEÇÃO UV ESPELHADO", "entregar_ate": "28/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 45, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "LUCIANO DA SILVA", "funcao": "AUX DE LIMPEZA", "epi": "LUVA NITRILICA", "entregar_ate": "31/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 46, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Lucineia da Conceição Reis Ribeiro", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "26/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 47, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Luiz de Sousa Paixão", "funcao": "MECANICO SILK SCREEN JR", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "20/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 48, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "MARCIO APARECIDO DE OLIVEIRA", "funcao": "MECANICO SILK SCREEN PL", "epi": "CREME PROTETOR DE SEGURANÇA", "entregar_ate": "28/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 49, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "MARCIO APARECIDO DE OLIVEIRA", "funcao": "MECANICO SILK SCREEN PL", "epi": "LUVA BRANCA TRICOTADA C/PIGMENTO", "entregar_ate": "03/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 50, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "MARCIO APARECIDO DE OLIVEIRA", "funcao": "MECANICO SILK SCREEN PL", "epi": "OCULOS DE PROTEÇÃO UV ESPELHADO", "entregar_ate": "28/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 51, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "MARCOS ANTONIO DOS SANTOS", "funcao": "OPERADOR DE MOINHO 2", "epi": "MASCARA SEMIFACIAL (3M)", "entregar_ate": "31/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 52, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Maria Aparecida Carlos dos Santos", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "02/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 53, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "MARIA CILENE SOARES", "funcao": "INSPETOR DE QUALIDADE PL", "epi": "LUVA DE PU CINZA", "entregar_ate": "27/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 54, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Mayra nunes Pereira Morais", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "03/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 55, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Mayra nunes Pereira Morais", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "04/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 56, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "MICHAEL SILVA DE JESUS", "funcao": "MECANICO DE SOPRO A", "epi": "CREME PROTETOR DE SEGURANÇA", "entregar_ate": "29/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 57, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "MICHAEL SILVA DE JESUS", "funcao": "MECANICO DE SOPRO A", "epi": "LUVA BRANCA TRICOTADA C/PIGMENTO", "entregar_ate": "31/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 58, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "MICHAEL SILVA DE JESUS", "funcao": "MECANICO DE SOPRO A", "epi": "OCULOS DE PROTEÇÃO QUADRADO INCOLOR", "entregar_ate": "29/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 59, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Michele Luana santos", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "27/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 60, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Miranilton Ferreira Barbosa", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "04/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 61, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Nubia Patricia Farias dos Santos Araujo", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "27/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 62, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Philipe Santana Sampaio", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "20/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 63, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Rebeca Santos Nascimento Oliveira", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "12/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 64, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Renan Dias Neiva", "funcao": "Técnico de manutenção elétrica", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "02/09/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 65, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Renata Lima do Nascimento", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "26/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 66, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Renata Magalhaes", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "27/07/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 67, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Ricardo Fermino Gonçalves", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "17/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 68, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "ROZIANE MELQUIADES", "funcao": "AJ DE PRODUÇAO", "epi": "LUVA DE PU CINZA", "entregar_ate": "03/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 69, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Sara Rosa Bezerra da Silva ", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "01/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 70, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Tatiane Reis Ribeiro", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "12/08/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 71, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Wemilson Silva de Lima ", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "01/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}, {"id": 72, "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA", "funcionario": "Willian andrelino dos Santos", "funcao": "AJ DE PRODUÇAO", "epi": "PROTETOR AUDITIVO (TIPO CONCHA)", "entregar_ate": "15/06/2026", "situacao": "Vencido", "status_entrega": "Pendente", "data_entrega_real": "", "obs": ""}];
+
+    const STORAGE_KEY = 'frasquim_epi_trimestral_v1';
+    let epiData = [];
+
+    // Checar Modo Somente Leitura via URL query param ou hash
+    const urlParams = new URLSearchParams(window.location.search);
+    const isReadOnly = urlParams.get('mode') === 'view' || window.location.hash === '#readonly';
+
+    function initData() {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) {
+        try {
+          epiData = JSON.parse(saved);
+        } catch (e) {
+          epiData = JSON.parse(JSON.stringify(INITIAL_DATA));
+        }
+      } else {
+        epiData = JSON.parse(JSON.stringify(INITIAL_DATA));
+      }
+    }
+
+    function saveData() {
+      if (!isReadOnly) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(epiData));
+      }
+    }
+
+    function resetData() {
+      if (isReadOnly) return;
+      if (confirm("Deseja restaurar os dados originais do relatório?")) {
+        epiData = JSON.parse(JSON.stringify(INITIAL_DATA));
+        saveData();
+        renderAll();
+        showToast("Dados restaurados!");
+      }
+    }
+
+    let epiChartInstance = null;
+    let statusChartInstance = null;
+
+    function initCharts() {
+      const ctxEpi = document.getElementById('epiChart').getContext('2d');
+      epiChartInstance = new Chart(ctxEpi, {
+        type: 'bar',
+        data: { labels: [], datasets: [{ label: 'Quantidade', data: [], backgroundColor: '#6366f1', borderRadius: 6 }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+            y: { ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { color: '#334155' } }
+          }
+        }
+      });
+
+      const ctxStatus = document.getElementById('statusChart').getContext('2d');
+      statusChartInstance = new Chart(ctxStatus, {
+        type: 'doughnut',
+        data: {
+          labels: ['Pendente', 'Entregue'],
+          datasets: [{ data: [72, 0], backgroundColor: ['#ef4444', '#10b981'], borderWidth: 0 }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 12 }, padding: 15 } }
+          },
+          cutout: '70%'
+        }
+      });
+    }
+
+    function updateCharts() {
+      const epiCounts = {};
+      let pendentesCount = 0;
+      let entreguesCount = 0;
+
+      epiData.forEach(item => {
+        epiCounts[item.epi] = (epiCounts[item.epi] || 0) + 1;
+        if (item.status_entrega === 'Entregue') {
+          entreguesCount++;
+        } else {
+          pendentesCount++;
+        }
+      });
+
+      const sortedEpis = Object.entries(epiCounts).sort((a, b) => b[1] - a[1]).slice(0, 7);
+      epiChartInstance.data.labels = sortedEpis.map(e => e[0].length > 20 ? e[0].substring(0, 18) + '...' : e[0]);
+      epiChartInstance.data.datasets[0].data = sortedEpis.map(e => e[1]);
+      epiChartInstance.update();
+
+      statusChartInstance.data.datasets[0].data = [pendentesCount, entreguesCount];
+      statusChartInstance.update();
+    }
+
+    function populateFilterOptions() {
+      const selectEpi = document.getElementById('filterEPI');
+      const uniqueEpis = [...new Set(epiData.map(d => d.epi))].sort();
+      uniqueEpis.forEach(epi => {
+        const opt = document.createElement('option');
+        opt.value = epi;
+        opt.textContent = epi;
+        selectEpi.appendChild(opt);
+      });
+    }
+
+    function renderKPIs() {
+      const total = epiData.length;
+      const entregues = epiData.filter(d => d.status_entrega === 'Entregue').length;
+      const pendentes = total - entregues;
+      const hoje = epiData.filter(d => d.situacao === 'Vencendo Hoje' && d.status_entrega !== 'Entregue').length;
+      const colabs = new Set(epiData.filter(d => d.status_entrega !== 'Entregue').map(d => d.funcionario)).size;
+
+      document.getElementById('kpiTotal').textContent = pendentes;
+      document.getElementById('kpiColabs').textContent = colabs;
+      document.getElementById('kpiHoje').textContent = hoje;
+      document.getElementById('kpiEntregues').textContent = entregues;
+
+      const pct = total > 0 ? Math.round((entregues / total) * 100) : 0;
+      document.getElementById('kpiProgresso').textContent = `${pct}% trocado (${entregues} de ${total})`;
+    }
+
+    function renderTable(filteredData) {
+      const tbody = document.getElementById('tableBody');
+      tbody.innerHTML = '';
+      document.getElementById('recordCount').textContent = filteredData.length;
+
+      filteredData.forEach((item) => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-slate-800/60 transition";
+
+        const isVencendoHoje = item.situacao === 'Vencendo Hoje';
+        const isEntregue = item.status_entrega === 'Entregue';
+
+        let situacaoBadge = isVencendoHoje
+          ? `<span class="bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded text-[11px] font-semibold inline-block">Vence Hoje</span>`
+          : `<span class="bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded text-[11px] font-semibold inline-block">Vencido</span>`;
+
+        let statusBadge = isEntregue
+          ? `<span class="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded text-[11px] font-semibold inline-flex items-center gap-1"><i data-lucide="check" class="w-3 h-3"></i> Trocado</span>`
+          : `<span class="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-[11px] font-semibold inline-block">Pendente</span>`;
+
+        tr.innerHTML = `
+          <td class="py-3 px-4 font-mono text-slate-500 text-[11px]">${item.id}</td>
+          <td class="py-3 px-4 font-medium text-slate-100">${item.funcionario}</td>
+          <td class="py-3 px-4 text-slate-400">${item.funcao}</td>
+          <td class="py-3 px-4 text-slate-200 font-medium">${item.epi}</td>
+          <td class="py-3 px-4 text-center font-mono ${isVencendoHoje ? 'text-amber-400 font-bold' : 'text-slate-300'}">${item.entregar_ate}</td>
+          <td class="py-3 px-4 text-center">${situacaoBadge}</td>
+          <td class="py-3 px-4 text-center">${statusBadge}</td>
+          <td class="py-3 px-4 text-center action-col">
+            ${isReadOnly ? `
+              <span class="text-[11px] text-slate-500 italic">Somente leitura</span>
+            ` : `
+              <button onclick="openEditModal(${item.id})" class="inline-flex items-center gap-1 bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1 rounded text-[11px] font-medium transition shadow-sm">
+                <i data-lucide="edit" class="w-3 h-3"></i>
+                <span>Editar</span>
+              </button>
+            `}
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      lucide.createIcons();
+    }
+
+    function applyFilters() {
+      const search = document.getElementById('searchInput').value.toLowerCase();
+      const epiFilter = document.getElementById('filterEPI').value;
+      const statusFilter = document.getElementById('filterStatus').value;
+
+      const filtered = epiData.filter(item => {
+        const matchesSearch = !search ||
+          item.funcionario.toLowerCase().includes(search) ||
+          item.epi.toLowerCase().includes(search) ||
+          item.funcao.toLowerCase().includes(search);
+
+        const matchesEpi = !epiFilter || item.epi === epiFilter;
+        const matchesStatus = !statusFilter || item.status_entrega === statusFilter;
+
+        return matchesSearch && matchesEpi && matchesStatus;
+      });
+
+      renderTable(filtered);
+    }
+
+    function clearFilters() {
+      document.getElementById('searchInput').value = '';
+      document.getElementById('filterEPI').value = '';
+      document.getElementById('filterStatus').value = '';
+      applyFilters();
+    }
+
+    function openEditModal(id) {
+      if (isReadOnly) return;
+      const item = epiData.find(d => d.id === id);
+      if (!item) return;
+
+      document.getElementById('editId').value = item.id;
+      document.getElementById('editFuncionario').value = item.funcionario;
+      document.getElementById('editEPI').value = item.epi;
+      document.getElementById('editStatus').value = item.status_entrega || 'Pendente';
+      document.getElementById('editDataEntrega').value = item.data_entrega_real || new Date().toISOString().split('T')[0];
+      document.getElementById('editObs').value = item.obs || '';
+
+      document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('editModal').classList.add('hidden');
+    }
+
+    function saveEdit(e) {
+      e.preventDefault();
+      if (isReadOnly) return;
+
+      const id = parseInt(document.getElementById('editId').value);
+      const item = epiData.find(d => d.id === id);
+      if (item) {
+        item.status_entrega = document.getElementById('editStatus').value;
+        item.data_entrega_real = document.getElementById('editDataEntrega').value;
+        item.obs = document.getElementById('editObs').value;
+
+        saveData();
+        renderAll();
+        closeModal();
+        showToast("Troca atualizada com sucesso!");
+      }
+    }
+
+    function exportToExcel() {
+      const exportList = epiData.map(d => ({
+        "ID": d.id,
+        "Empresa": d.empresa,
+        "Funcionário": d.funcionario,
+        "Função": d.funcao,
+        "Tipo de EPI": d.epi,
+        "Entregar Até (SGG)": d.entregar_ate,
+        "Situação SGG": d.situacao,
+        "Status da Troca": d.status_entrega,
+        "Data Real da Troca": d.data_entrega_real,
+        "Observações / C.A. / Assinatura": d.obs
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportList);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Trocas_Trimestrais");
+      XLSX.writeFile(wb, "EPIs_Trimestrais_Frasquim_Atualizado.xlsx");
+      showToast("Planilha Excel exportada!");
+    }
+
+    function copyReadOnlyLink() {
+      const base = window.location.href.split('?')[0].split('#')[0];
+      const readOnlyUrl = `${base}?mode=view#readonly`;
+
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(readOnlyUrl).then(() => {
+          showToast("Link Somente Visualização copiado!");
+        }).catch(() => {
+          prompt("Copie o link abaixo para compartilhar em modo visualização:", readOnlyUrl);
+        });
+      } else {
+        prompt("Copie o link abaixo para compartilhar em modo visualização:", readOnlyUrl);
+      }
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 3000);
+    }
+
+    function checkReadOnlyMode() {
+      if (isReadOnly) {
+        document.getElementById('readOnlyBanner').classList.remove('hidden');
+        document.getElementById('btnReset').classList.add('hidden');
+        document.getElementById('btnShare').classList.add('hidden');
+      }
+    }
+
+    function renderAll() {
+      renderKPIs();
+      updateCharts();
+      applyFilters();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      initData();
+      checkReadOnlyMode();
+      populateFilterOptions();
+      initCharts();
+      renderAll();
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

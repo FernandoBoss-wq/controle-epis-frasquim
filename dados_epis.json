@@ -1,0 +1,29 @@
+{
+  "ultima_atualizacao": "10/09/2026 11:32:55",
+  "dados": [
+    {
+      "id": 1,
+      "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA",
+      "funcionario": "ADDSON BERG DE SÁ MENEZES SOARES",
+      "funcao": "AUXILIAR DE APOIO A PRODUÇÃO",
+      "epi": "PROTETOR AURICULAR (TIPO SILICONE)",
+      "entregar_ate": "03/08/2026",
+      "situacao": "Vencido",
+      "status_entrega": "Pendente",
+      "data_entrega_real": "",
+      "obs": ""
+    },
+    {
+      "id": 2,
+      "empresa": "FRASQUIM INDUSTRIA E COMERCIO LTDA",
+      "funcionario": "AILTON DA SILVA CAMPOS",
+      "funcao": "MECANICO DE SOPRO A",
+      "epi": "CREME PROTETOR DE SEGURANÇA",
+      "entregar_ate": "28/08/2026",
+      "situacao": "Vencido",
+      "status_entrega": "Pendente",
+      "data_entrega_real": "",
+      "obs": ""
+    }
+  ]
+}
